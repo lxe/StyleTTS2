@@ -20,7 +20,9 @@ from .utils import recursive_munch
 
 class TTS:
     def __init__(self, model_params, model, device):
-        if not nltk.find('tokenizers/punkt'):
+        try:
+            nltk.find('tokenizers/punkt')
+        except LookupError:
             nltk.download('punkt')
 
         self.model_params = model_params
