@@ -133,15 +133,18 @@ class TTS:
         ps = ' '.join(word_tokenize(ps[0]))
 
         # Prepare tokens
-        tokens = torch.LongTensor([0] + self.text_cleaner(ps)).to(self.device).unsqueeze(0)
+        tokens = torch.LongTensor(
+            [0] + self.text_cleaner(ps)).to(self.device).unsqueeze(0)
 
         with torch.no_grad():
-            input_lengths = torch.LongTensor([tokens.shape[-1]]).to(self.device)
+            input_lengths = torch.LongTensor(
+                [tokens.shape[-1]]).to(self.device)
             text_mask = self.length_to_mask(input_lengths).to(self.device)
 
             # Encode text
             t_en = self.model.text_encoder(tokens, input_lengths, text_mask)
-            bert_dur = self.model.bert(tokens, attention_mask=(~text_mask).int())
+            bert_dur = self.model.bert(
+                tokens, attention_mask=(~text_mask).int())
             d_en = self.model.bert_encoder(bert_dur).transpose(-1, -2)
 
             # Predict style
@@ -149,7 +152,7 @@ class TTS:
                 noise=torch.randn((1, 256)).unsqueeze(1).to(self.device),
                 embedding=bert_dur,
                 embedding_scale=embedding_scale,
-                features=ref_s,
+                features=ref_s,  # reference from the same speaker as the embedding
                 num_steps=diffusion_steps
             ).squeeze(1)
 
@@ -166,7 +169,8 @@ class TTS:
             s_pred = torch.cat([ref, s], dim=-1)
 
             # Predict duration
-            d = self.model.predictor.text_encoder(d_en, s, input_lengths, text_mask)
+            d = self.model.predictor.text_encoder(
+                d_en, s, input_lengths, text_mask)
             x, _ = self.model.predictor.lstm(d)
             duration = self.model.predictor.duration_proj(x)
             duration = torch.sigmoid(duration).sum(axis=-1)
@@ -198,6 +202,8 @@ class TTS:
                 asr = asr_new
 
             # Decode
-            out = self.model.decoder(asr, F0_pred, N_pred, ref.squeeze().unsqueeze(0))
+            out = self.model.decoder(
+                asr, F0_pred, N_pred, ref.squeeze().unsqueeze(0))
 
-        return out.squeeze().cpu().numpy(), s_pred
+        # Fix weird pulse at the end later
+        return out.squeeze().cpu().numpy()[..., :-100], s_pred
